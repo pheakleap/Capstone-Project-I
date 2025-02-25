@@ -8,5 +8,10 @@ demo = gr.Interface(
     inputs=["text"],
     outputs=["text"],
 )
+demo = gr.Interface(
+    fn=greet,
+    inputs=["text"],
+    outputs=["text"],
+)
 
 demo.launch()
