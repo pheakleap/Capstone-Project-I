@@ -1,57 +1,83 @@
 import gradio as gr
-import pandas as pd
+import json
 import joblib
 
+# Load symptom encodings
+try:
+    with open("D:/Term7/Capstone-Project-I/data/processed/name_symptom.json", "r") as f:
+        symptom_encodings = json.load(f)
+except FileNotFoundError:
+    print("Error: symptom_encodings.json not found.")
+    symptom_encodings = {}
+
 # Load trained model
-model = joblib.load("D:/Term7/Capstone-Project-I/src/models/random_forest.pkl")
+try:
+    model = joblib.load("D:/Term7/Capstone-Project-I/src/models/random_forest.pkl")
+    print("Model loaded successfully:", model)  # Debugging print
+except FileNotFoundError:
+    print("Error: random_forest.pkl model file not found.")
+    model = None
+except Exception as e:
+    print(f"Error loading model: {e}")
+    model = None
 
-# Load datasets for encoding
-before_encode = pd.read_csv("D:/Term7/Capstone-Project-I/data/processed/before_encode.csv")
-encode_data = pd.read_csv("D:/Term7/Capstone-Project-I/data/processed/encode_data.csv")
+# Load disease mappings
+try:
+    with open("D:/Term7/Capstone-Project-I/data/processed/name_disease.json", "r") as f:
+        disease_mappings = json.load(f)
+except FileNotFoundError:
+    print("Warning: disease_name.json not found. Disease names will not be displayed.")
+    disease_mappings = {}
 
-# Extract feature columns and target labels
-X = before_encode.drop(columns=["Disease"])
-y = before_encode["Disease"]
+# Invert the disease_mappings dictionary
+disease_index_to_name = {v: k for k, v in disease_mappings.items()}
+def process_symptoms(selected_symptoms):
+    # Ensure all 17 symptoms are encoded, with 'none' (75) for missing symptoms
+    encoded_symptoms = [symptom_encodings.get(symptom, 75) for symptom in selected_symptoms]  # Default to 'none' (75) for missing symptoms
 
-X_encode = encode_data.drop(columns=["Disease"])
-y_encode = encode_data["Disease"]
+    # If fewer than 17 features are provided, pad the rest with the 'none' encoding
+    while len(encoded_symptoms) < 17:
+        encoded_symptoms.append(75)  # Add 'none' encoding for missing symptoms
 
-# Create encoding dictionaries
-encoding_map = {col: {val: idx for idx, val in enumerate(X[col].unique())} for col in X.columns}
-disease_mapping = dict(enumerate(y.unique()))  # Map numbers back to disease names
+    # Check if the number of features is correct (17)
+    if len(encoded_symptoms) != 17:
+        return "Error: The number of symptoms should be 17 features.", [], "Prediction not possible."
 
-# Function to preprocess user input
-def preprocess_input(*user_inputs):
-    """
-    Convert user inputs into the encoded format required by the trained model.
-    """
-    input_dict = {col: [encoding_map[col].get(value, -1)] for col, value in zip(X.columns, user_inputs)}
-    input_df = pd.DataFrame(input_dict)
-    
-    # Handle missing values or unknown inputs
-    input_df = input_df.replace(-1, 0)  # Replace unknown values with default (e.g., 0)
-    
-    return input_df
+    if model:
+        try:
+            prediction = model.predict([encoded_symptoms])
+            print("Model prediction:", prediction)  # Debugging print
 
-# Prediction function
-def predict_disease(*user_inputs):
-    """
-    Takes raw user input, encodes it, and predicts the disease using the trained model.
-    """
-    input_df = preprocess_input(*user_inputs)
-    prediction = model.predict(input_df)[0]
-    
-    # Decode predicted disease number to actual disease name
-    predicted_disease = disease_mapping.get(prediction, "Unknown Disease")
-    
-    return f"Predicted Disease: {predicted_disease}"
+            predicted_disease_index = prediction[0]
 
-# Create Gradio interface
-inputs = [gr.Dropdown(choices=list(X[col].unique()), label=col) for col in X.columns]
-output = gr.Textbox(label="Prediction Result")
+            # Use inverted disease index-to-name mapping
+            if predicted_disease_index in disease_index_to_name:
+                predicted_disease_name = disease_index_to_name[predicted_disease_index]
+                prediction_text = f"Predicted disease: {predicted_disease_name}"
+            else:
+                prediction_text = f"Predicted disease index: {predicted_disease_index} (No name found)"
+        except Exception as e:
+            prediction_text = f"Prediction error: {e}"
+    else:
+        prediction_text = "Model not loaded. Prediction unavailable."
 
-demo = gr.Interface(fn=predict_disease, inputs=inputs, outputs=output, title="Disease Prediction System")
+    return f"Selected symptoms: {', '.join(selected_symptoms)}, Encoded values: {encoded_symptoms}", encoded_symptoms, prediction_text
 
-# Run the Gradio app
-if __name__ == "__main__":
-    demo.launch()
+with gr.Blocks() as demo:
+    with gr.Row():
+        with gr.Column():
+            checkbox_group = gr.CheckboxGroup(list(symptom_encodings.keys()), label="Select your symptoms")
+            submit_button = gr.Button("Submit")
+
+        with gr.Column():
+            text_output = gr.Textbox(label="Output")
+            machine_output = gr.State([])
+            prediction_output = gr.Textbox(label="Prediction")
+
+    submit_button.click(
+        fn=process_symptoms,
+        inputs=checkbox_group,
+        outputs=[text_output, machine_output, prediction_output]
+    )
+
+demo.launch()
