@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symptom Checker</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        .search-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #search-input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .category-container {
+            margin-bottom: 20px;
+        }
+        .category-title {
+            background-color: #f0f0f0;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .category-items {
+            display: none;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .category-items.show {
+            display: block;
+        }
+        .symptom-item {
+            display: inline-block;
+            background-color: #e0e0e0;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        .selected-symptoms {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 10px;
+            background-color: white;
+        }
+        .selected-tag {
+            background-color: #b0e0e6;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+        .selected-tag span {
+            cursor: pointer;
+        }
+        .prediction-result {
+            background-color: #a8dadc;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Enter symptom...">
+        <ul id="autocomplete-list"></ul>
+    </div>
+
+    <div class="category-container">
+        <div class="category-title" onclick="toggleCategory('pain')">Pain</div>
+        <div class="category-items" id="pain">
+            <div class="symptom-item" data-symptom="Headache">Headache</div>
+            <div class="symptom-item" data-symptom="Chest Pain">Chest Pain</div>
+            <div class="symptom-item" data-symptom="Abdominal Pain">Abdominal Pain</div>
+        </div>
+
+        <div class="category-title" onclick="toggleCategory('respiratory')">Respiratory</div>
+        <div class="category-items" id="respiratory">
+            <div class="symptom-item" data-symptom="Cough">Cough</div>
+            <div class="symptom-item" data-symptom="Shortness of Breath">Shortness of Breath</div>
+            <div class="symptom-item" data-symptom="Wheezing">Wheezing</div>
+        </div>
+
+        </div>
+
+    <div class="selected-symptoms">
+        <p>Selected Symptoms: <span id="selected-count">0/17</span></p>
+        <div id="selected-list"></div>
+        <p id="error-message" class="error-message"></p>
+    </div>
+
+    <div class="prediction-result" id="prediction-result" style="display: none;">
+        <p>Predicted Condition: <span id="predicted-condition"></span></p>
+        <button id="explain-button">Explain Diagnosis</button>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const selectedList = document.getElementById('selected-list');
+        const selectedCount = document.getElementById('selected-count');
+        const predictionResult = document.getElementById('prediction-result');
+        const predictedCondition = document.getElementById('predicted-condition');
+        const errorMessage = document.getElementById('error-message');
+        const explainButton = document.getElementById('explain-button');
+
+        let selectedSymptoms = [];
+        const maxSymptoms = 17;
+
+        function toggleCategory(categoryId) {
+            const categoryItems = document.getElementById(categoryId);
+            categoryItems.classList.toggle('show');
+        }
+
+        function updateSelectedList() {
+            selectedList.innerHTML = '';
+            selectedSymptoms.forEach(symptom => {
+                const tag = document.createElement('div');
+                tag.classList.add('selected-tag');
+                tag.textContent = symptom;
+                const removeButton = document.createElement('span');
+                removeButton.textContent = ' ×';
+                removeButton.onclick = () => removeSymptom(symptom);
+                tag.appendChild(removeButton);
+                selectedList.appendChild(tag);
+            });
+            selectedCount.textContent = `${selectedSymptoms.length}/${maxSymptoms}`;
+        }
+
+        function addSymptom(symptom) {
+            if (selectedSymptoms.length >= maxSymptoms) {
+                errorMessage.textContent = "You can select a maximum of 17 symptoms.";
+                return;
+            }
+            errorMessage.textContent = "";
+            if (!selectedSymptoms.includes(symptom)) {
+                selectedSymptoms.push(symptom);
+                updateSelectedList();
+            }
+        }
+
+        function removeSymptom(symptom) {
+            selectedSymptoms = selectedSymptoms.filter(s => s !== symptom);
+            updateSelectedList();
+        }
+
+        document.querySelectorAll('.symptom-item').forEach(item => {
+            item.addEventListener('click', () => {
+                addSymptom(item.dataset.symptom);
+            });
+        });
+
+        document.getElementById('explain-button').addEventListener('click', function(){
+            alert("Explanation of diagnosis would go here");
+        });
+
+        function predictCondition() {
+            // Placeholder for prediction logic
+            if (selectedSymptoms.includes("Headache") && selectedSymptoms.includes("Chest Pain")) {
+                predictedCondition.textContent = "Hypertension";
+            } else if (selectedSymptoms.includes("Cough") && selectedSymptoms.includes("Shortness of Breath")) {
+                predictedCondition.textContent = "Respiratory Infection";
+            } else {
+                predictedCondition.textContent = "Unable to determine.";
+            }
+            predictionResult.style.display = "block";
+        }
+
+        searchInput.addEventListener('keypress', function(event) {
+            if (event.key === "Enter") {
+                addSymptom(searchInput.value);
+                searchInput.value = "";
+            }
+        });
+        document.addEventListener('keypress', function(event){
+            if (event.key === "Predict"){
+                predictCondition();
+            }
+        });
+    </script>
+</body>
+</html>
