@@ -3,3 +3,4 @@ ml_env/
 *.dll
 *.pyd
 *.joblib
+*.csv
