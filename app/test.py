@@ -1,83 +1,52 @@
 import gradio as gr
 import json
 import joblib
+import numpy as np
 
-# Load symptom encodings
-try:
-    with open("D:/Term7/Capstone-Project-I/data/processed/name_symptom.json", "r") as f:
-        symptom_encodings = json.load(f)
-except FileNotFoundError:
-    print("Error: symptom_encodings.json not found.")
-    symptom_encodings = {}
+# Load data from JSON files
+with open("D:/Term7/Capstone-Project-I/data/processed/symptom_mapping.json", "r") as f:
+    features_data = json.load(f)
 
-# Load trained model
-try:
-    model = joblib.load("D:/Term7/Capstone-Project-I/src/models/random_forest.pkl")
-    print("Model loaded successfully:", model)  # Debugging print
-except FileNotFoundError:
-    print("Error: random_forest.pkl model file not found.")
-    model = None
-except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
+with open("D:/Term7/Capstone-Project-I/data/processed/disease_mapping.json", "r") as f:
+    diseases_data = json.load(f)
 
-# Load disease mappings
-try:
-    with open("D:/Term7/Capstone-Project-I/data/processed/name_disease.json", "r") as f:
-        disease_mappings = json.load(f)
-except FileNotFoundError:
-    print("Warning: disease_name.json not found. Disease names will not be displayed.")
-    disease_mappings = {}
+feature_names = [feature["name"] for feature in features_data]
+disease_names = list(diseases_data.keys())
 
-# Invert the disease_mappings dictionary
-disease_index_to_name = {v: k for k, v in disease_mappings.items()}
-def process_symptoms(selected_symptoms):
-    # Ensure all 17 symptoms are encoded, with 'none' (75) for missing symptoms
-    encoded_symptoms = [symptom_encodings.get(symptom, 75) for symptom in selected_symptoms]  # Default to 'none' (75) for missing symptoms
+# Load your trained model
+model = joblib.load("D:/Term7/Capstone-Project-I/model/trained_model.joblib") #Replace with your model path
 
-    # If fewer than 17 features are provided, pad the rest with the 'none' encoding
-    while len(encoded_symptoms) < 17:
-        encoded_symptoms.append(75)  # Add 'none' encoding for missing symptoms
+def predict(selected_features):
+    selected_feature_ids = [features_data[feature_names.index(feature)]["id"] for feature in selected_features]
 
-    # Check if the number of features is correct (17)
-    if len(encoded_symptoms) != 17:
-        return "Error: The number of symptoms should be 17 features.", [], "Prediction not possible."
+    # Create input vector for the model
+    input_vector = np.zeros(len(features_data))
+    for feature_id in selected_feature_ids:
+        input_vector[feature_id] = 1
 
-    if model:
-        try:
-            prediction = model.predict([encoded_symptoms])
-            print("Model prediction:", prediction)  # Debugging print
+    # Reshape the input vector for prediction
+    input_vector = input_vector.reshape(1, -1)
 
-            predicted_disease_index = prediction[0]
+    # Get the model's prediction probabilities
+    prediction_probabilities = model.predict_proba(input_vector)[0]
 
-            # Use inverted disease index-to-name mapping
-            if predicted_disease_index in disease_index_to_name:
-                predicted_disease_name = disease_index_to_name[predicted_disease_index]
-                prediction_text = f"Predicted disease: {predicted_disease_name}"
-            else:
-                prediction_text = f"Predicted disease index: {predicted_disease_index} (No name found)"
-        except Exception as e:
-            prediction_text = f"Prediction error: {e}"
-    else:
-        prediction_text = "Model not loaded. Prediction unavailable."
+    # Create a dictionary of disease names and probabilities
+    prediction = {disease: probability for disease, probability in zip(disease_names, prediction_probabilities)}
 
-    return f"Selected symptoms: {', '.join(selected_symptoms)}, Encoded values: {encoded_symptoms}", encoded_symptoms, prediction_text
+    # Format output as disease: probability (percentage)
+    formatted_prediction = {disease: f"{probability * 100:.2f}%" for disease, probability in prediction.items()}
 
-with gr.Blocks() as demo:
-    with gr.Row():
-        with gr.Column():
-            checkbox_group = gr.CheckboxGroup(list(symptom_encodings.keys()), label="Select your symptoms")
-            submit_button = gr.Button("Submit")
+    # Sort output by probability
+    sorted_prediction = dict(sorted(formatted_prediction.items(), key=lambda item: float(item[1].strip('%')), reverse=True))
 
-        with gr.Column():
-            text_output = gr.Textbox(label="Output")
-            machine_output = gr.State([])
-            prediction_output = gr.Textbox(label="Prediction")
+    return sorted_prediction
 
-    submit_button.click(
-        fn=process_symptoms,
-        inputs=checkbox_group,
-        outputs=[text_output, machine_output, prediction_output]
-    )
+iface = gr.Interface(
+    fn=predict,
+    inputs=gr.CheckboxGroup(choices=feature_names, label="Select your symptoms"),
+    outputs=gr.Label(label="Prediction Results"),
+    title="Medical Prediction Model",
+    description="Select your symptoms to get a prediction of possible diseases.",
+)
 
-demo.launch()
+iface.launch()
