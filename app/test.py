@@ -1,52 +1,139 @@
 import gradio as gr
-import json
-import joblib
 import numpy as np
+import joblib
+from sklearn.preprocessing import LabelEncoder
 
-# Load data from JSON files
-with open("D:/Term7/Capstone-Project-I/data/processed/symptom_mapping.json", "r") as f:
-    features_data = json.load(f)
+# Load all necessary artifacts
+model = joblib.load("D:/Term7/Capstone-Project-I//src/models/best_ensemble_model.joblib")
+symptom_encoder = joblib.load("D:/Term7/Capstone-Project-I//src/models/symptom_encoder.joblib")
+disease_encoder = joblib.load("D:/Term7/Capstone-Project-I//src/models/disease_encoder.joblib")
 
-with open("D:/Term7/Capstone-Project-I/data/processed/disease_mapping.json", "r") as f:
-    diseases_data = json.load(f)
+# Get all symptom and disease names
+all_symptoms = symptom_encoder.classes_
+all_diseases = disease_encoder.classes_
 
-feature_names = [feature["name"] for feature in features_data]
-disease_names = list(diseases_data.keys())
+def predict_disease(*selected_symptoms_indices):
+    """Predict disease based on selected symptom indices"""
+    try:
+        # Convert Gradio checkbox indices to symptom names
+        selected_symptoms = [all_symptoms[i] for i, checked in enumerate(selected_symptoms_indices) if checked]
+        
+        # Create feature vector (0 for absent, 1 for present)
+        features = np.zeros(len(all_symptoms))
+        for symptom in selected_symptoms:
+            idx = np.where(symptom_encoder.classes_ == symptom)[0][0]
+            features[idx] = 1
+        
+        # Reshape for prediction (scaling is handled internally by the pipelines)
+        features_reshaped = features.reshape(1, -1)
+        
+        # Get predictions and probabilities
+        predicted_index = model.predict(features_reshaped)[0]
+        probabilities = model.predict_proba(features_reshaped)[0]
+        
+        # Get top 3 predictions
+        top3_indices = np.argsort(probabilities)[-3:][::-1]
+        
+        # Format results
+        results = {
+            "Primary Diagnosis": {
+                "Disease": all_diseases[top3_indices[0]],
+                "Confidence": f"{probabilities[top3_indices[0]]*100:.1f}%"
+            },
+            "Secondary Options": [
+                {
+                    "Disease": all_diseases[top3_indices[1]],
+                    "Confidence": f"{probabilities[top3_indices[1]]*100:.1f}%"
+                },
+                {
+                    "Disease": all_diseases[top3_indices[2]],
+                    "Confidence": f"{probabilities[top3_indices[2]]*100:.1f}%"
+                }
+            ],
+            "Symptoms Considered": len(selected_symptoms),
+            "Detailed Symptoms": [s.replace('_', ' ').title() for s in selected_symptoms]
+        }
+        
+        return results
+    
+    except Exception as e:
+        return {"error": f"Prediction failed: {str(e)}"}
 
-# Load your trained model
-model = joblib.load("D:/Term7/Capstone-Project-I/model/trained_model.joblib") #Replace with your model path
+# Create Gradio interface
+with gr.Blocks(theme=gr.themes.Soft(), title="Medical Diagnosis Assistant") as app:
+    gr.Markdown("""
+    # 🩺 Medical Diagnosis Assistant
+    Select your symptoms to receive potential diagnoses.
+    """)
+    
+    with gr.Row():
+        with gr.Column(scale=2):
+            # Organize symptoms in tabs by category
+            with gr.Tabs():
+                # General Symptoms Tab
+                with gr.Tab("General Symptoms"):
+                    with gr.Row():
+                        # Split symptoms into 3 columns
+                        cols = 3
+                        symptoms_per_col = (len(all_symptoms) + cols - 1) // cols
+                        
+                        for col_idx in range(cols):
+                            with gr.Column():
+                                start_idx = col_idx * symptoms_per_col
+                                end_idx = min((col_idx + 1) * symptoms_per_col, len(all_symptoms))
+                                
+                                for symptom in all_symptoms[start_idx:end_idx]:
+                                    gr.Checkbox(
+                                        label=symptom.replace('_', ' ').title(),
+                                        value=False
+                                    )
+            
+            # Example cases
+            gr.Examples(
+                examples=[
+                    [True if s in ["itching", "skin_rash", "nodal_skin_eruptions"] else False 
+                     for s in all_symptoms],
+                    [True if s in ["continuous_sneezing", "shivering", "watering_from_eyes"] else False 
+                     for s in all_symptoms],
+                    [True if s in ["high_fever", "headache", "vomiting", "fatigue"] else False 
+                     for s in all_symptoms]
+                ],
+                label="Try Example Cases",
+                inputs=[comp for comp in app.blocks.values() if isinstance(comp, gr.Checkbox)]
+            )
+            
+            submit_btn = gr.Button("Analyze Symptoms", variant="primary")
+        
+        with gr.Column(scale=1):
+            with gr.Accordion("Diagnosis Results", open=True):
+                diagnosis_output = gr.JSON(label="Prediction Results")
+                
+            with gr.Accordion("How to Interpret Results", open=False):
+                gr.Markdown("""
+                - **Primary Diagnosis**: The most likely condition based on your symptoms
+                - **Secondary Options**: Other possible conditions to consider
+                - **Confidence Percentage**: The model's certainty in each prediction
+                """)
+    
+    # Footer
+    gr.Markdown("""
+    <div style='text-align: center; margin-top: 20px; font-size: 0.9em; color: #666;'>
+    <i>Important: This tool provides informational predictions only and is not a substitute 
+    for professional medical advice, diagnosis, or treatment.</i>
+    </div>
+    """)
+    
+    # Connect the button
+    submit_btn.click(
+        fn=predict_disease,
+        inputs=[comp for comp in app.blocks.values() if isinstance(comp, gr.Checkbox)],
+        outputs=diagnosis_output
+    )
 
-def predict(selected_features):
-    selected_feature_ids = [features_data[feature_names.index(feature)]["id"] for feature in selected_features]
-
-    # Create input vector for the model
-    input_vector = np.zeros(len(features_data))
-    for feature_id in selected_feature_ids:
-        input_vector[feature_id] = 1
-
-    # Reshape the input vector for prediction
-    input_vector = input_vector.reshape(1, -1)
-
-    # Get the model's prediction probabilities
-    prediction_probabilities = model.predict_proba(input_vector)[0]
-
-    # Create a dictionary of disease names and probabilities
-    prediction = {disease: probability for disease, probability in zip(disease_names, prediction_probabilities)}
-
-    # Format output as disease: probability (percentage)
-    formatted_prediction = {disease: f"{probability * 100:.2f}%" for disease, probability in prediction.items()}
-
-    # Sort output by probability
-    sorted_prediction = dict(sorted(formatted_prediction.items(), key=lambda item: float(item[1].strip('%')), reverse=True))
-
-    return sorted_prediction
-
-iface = gr.Interface(
-    fn=predict,
-    inputs=gr.CheckboxGroup(choices=feature_names, label="Select your symptoms"),
-    outputs=gr.Label(label="Prediction Results"),
-    title="Medical Prediction Model",
-    description="Select your symptoms to get a prediction of possible diseases.",
-)
-
-iface.launch()
+# Run the app
+if __name__ == "__main__":
+    app.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=True
+    )
