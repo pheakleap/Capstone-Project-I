@@ -1,10 +1,7 @@
 <<<<<<< HEAD
 *.pkl
 venv/
-=======
-# Ignore virtual environments
 ml_env/
 *.dll
 *.pyd
 *.joblib
->>>>>>> 5c71353d8cd78e46064aa9964a2d859b7a814f1f
