@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symptom Checker</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        .search-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #search-input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .category-container {
+            margin-bottom: 20px;
+        }
+        .category-title {
+            background-color: #f0f0f0;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .category-items {
+            display: none;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .category-items.show {
+            display: block;
+        }
+        .symptom-item {
+            display: inline-block;
+            background-color: #e0e0e0;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        .selected-symptoms {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 10px;
+            background-color: white;
+        }
+        .selected-tag {
+            background-color: #b0e0e6;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+        .selected-tag span {
+            cursor: pointer;
+        }
+        .prediction-result {
+            background-color: #a8dadc;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+        #autocomplete-list{
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            width: 80%;
+            left: 10%;
+            display: none;
+        }
+        #autocomplete-list li{
+            padding: 8px;
+            cursor: pointer;
+        }
+        #autocomplete-list li:hover{
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Enter symptom...">
+        <ul id="autocomplete-list"></ul>
+    </div>
+
+    <div class="category-container">
+        <div class="category-title" onclick="toggleCategory('pain')">Pain</div>
+        <div class="category-items" id="pain">
+            <div class="symptom-item" data-symptom="abdominal_pain">Abdominal Pain</div>
+            <div class="symptom-item" data-symptom="back_pain">Back Pain</div>
+            <div class="symptom-item" data-symptom="belly_pain">Belly Pain</div>
+            <div class="symptom-item" data-symptom="chest_pain">Chest Pain</div>
+            <div class="symptom-item" data-symptom="headache">Headache</div>
+            <div class="symptom-item" data-symptom="hip_joint_pain">Hip Joint Pain</div>
+            <div class="symptom-item" data-symptom="joint_pain">Joint Pain</div>
+            <div class="symptom-item" data-symptom="knee_pain">Knee Pain</div>
+            <div class="symptom-item" data-symptom="muscle_pain">Muscle Pain</div>
+            <div class="symptom-item" data-symptom="neck_pain">Neck Pain</div>
+            <div class="symptom-item" data-symptom="pain_behind_the_eyes">Pain Behind the Eyes</div>
+            <div class="symptom-item" data-symptom="pain_during_bowel_movements">Pain During Bowel Movements</div>
+            <div class="symptom-item" data-symptom="pain_in_anal_region">Pain in Anal Region</div>
+            <div class="symptom-item" data-symptom="painful_walking">Painful Walking</div>
+        </div>
+
+        <div class="category-title" onclick="toggleCategory('respiratory')">Respiratory</div>
+        <div class="category-items" id="respiratory">
+            <div class="symptom-item" data-symptom="breathlessness">Breathlessness</div>
+            <div class="symptom-item" data-symptom="cough">Cough</div>
+            <div class="symptom-item" data-symptom="mucoid_sputum">Mucoid Sputum</div>
+            <div class="symptom-item" data-symptom="phlegm">Phlegm</div>
+            <div class="symptom-item" data-symptom="runny_nose">Runny Nose</div>
+            <div class="symptom-item" data-symptom="sinus_pressure">Sinus Pressure</div>
+            <div class="symptom-item" data-symptom="throat_irritation">Throat Irritation</div>
+        </div>
+
+        <div class="category-title" onclick="toggleCategory('digestive')">Digestive</div>
+        <div class="category-items" id="digestive">
+            <div class="symptom-item" data-symptom="acidity">Acidity</div>
+            <div class="symptom-item" data-symptom="bloody_stool">Bloody Stool</div>
+            <div class="symptom-item" data-symptom="constipation">Constipation</div>
+            <div class="symptom-item" data-symptom="diarrhoea">Diarrhoea</div>
+            <div class="symptom-item" data-symptom="indigestion">Indigestion</div>
+            <div class="symptom-item" data-symptom="loss_of_appetite">Loss of Appetite</div>
+            <div class="symptom-item" data-symptom="nausea">Nausea</div>
+            <div class="symptom-item" data-symptom="stomach_bleeding">Stomach Bleeding</div>
+            <div class="symptom-item" data-symptom="stomach_pain">Stomach Pain</div>
+            <div class="symptom-item" data-symptom="vomiting">Vomiting</div>
+        </div>
+    </div>
+
+    <div class="selected-symptoms">
+        <p>Selected Symptoms: <span id="selected-count">0/17</span></p>
+        <div id="selected-list"></div>
+        <p id="error-message" class="error-message"></p>
+    </div>
+
+    <div class="prediction-result" id="prediction-result" style="display: none;">
+        <p>Predicted Condition: <span id="predicted-condition"></span></p>
+        <button id="explain-button">Explain Diagnosis</button>
+    </div>
+
+    <script>
+        const symptomsData = {
+            "abdominal_pain": 0, "abnormal_menstruation": 1, "acidity": 2, "acute_liver_failure": 3, "altered_sensorium": 4, "anxiety": 5, "back_pain": 6, "belly_pain": 7, "blackheads": 8, "bladder_discomfort": 9, "blister": 10, "blood_in_sputum": 11, "bloody_stool": 12, "blurred_and_distorted_vision": 13, "breathlessness": 14, "brittle_nails": 15, "bruising": 16, "burning_micturition": 17, "chest_pain": 18, "chills": 19, "cold_hands_and_feets": 20, "coma": 21, "congestion": 22, "constipation": 23, "continuous_feel_of_urine": 24, "continuous_sneezing": 25, "cough": 26, "cramps": 27, "dark_urine": 28, "dehydration": 29, "depression": 30, "diarrhoea": 31, "dischromic _patches": 32, "distention_of_abdomen": 33, "dizziness": 34, "drying_and_tingling_lips": 35, "enlarged_thyroid": 36, "excessive_hunger": 37, "extra_marital_contacts": 38, "family_history": 39, "fast_heart_rate": 40, "fatigue": 41, "fluid_overload": 42, "foul_smell_of urine": 43, "headache": 44, "high_fever": 45, "hip_joint_pain": 46, "history_of_alcohol_consumption": 47, "increased_appetite": 48, "indigestion": 49, "inflammatory_nails": 50, "internal_itching": 51, "irregular_sugar_level": 52, "irritability": 53, "irritation_in_anus": 54, "itching": 55, "joint_pain": 56, "knee_pain": 57, "lack_of_concentration": 58, "lethargy": 59, "loss_of_appetite": 60, "loss_of_balance": 61, "loss_of_smell": 62, "malaise": 63, "mild_fever": 64, "mood_swings": 65, "movement_stiffness": 66, "mucoid_sputum": 67, "muscle_pain": 68, "muscle_wasting": 69, "muscle_weakness": 70, "nausea": 71, "neck_pain": 72, "nodal_skin_eruptions": 73, "none": 74, "obesity": 75, "pain_behind_the_eyes": 76, "pain_during_bowel_movements": 77, "pain_in_anal_region": 78, "painful_walking": 79, "palpitations": 80, "passage_of_gases": 81, "patches_in_throat": 82, "phlegm": 83, "polyuria": 84, "prominent_veins_on_calf": 85, "puffy_face_and_eyes": 86, "pus_filled_pimples": 87, "receiving_blood_transfusion": 88, "receiving_unsterile_injections": 89, "red_sore_around_nose": 90, "red_spots_over_body": 91, "redness_of_eyes": 92, "restlessness": 93, "runny_nose": 94, "rusty_sputum": 95, "scurring": 96, "shivering": 97, "silver_like_dusting": 98, "sinus_pressure": 99, "skin_peeling": 100, "skin_rash": 101, "slurred_speech": 102, "small_dents_in_nails": 103, "spinning_movements": 104, "spotting_ urination": 105, "stiff_neck": 106, "stomach_bleeding": 107, "stomach_pain": 108, "sunken_eyes": 109, "sweating": 110, "swelled_lymph_nodes": 111, "swelling_joints": 112, "swelling_of_stomach": 113, "swollen_blood_vessels": 114, "swollen_extremeties": 115, "swollen_legs": 116, "throat_irritation": 117, "toxic_look_(typhos)": 118, "ulcers_on_tongue": 119, "unsteadiness": 120, "visual_disturbances": 121, "vomiting": 122, "watering_from_eyes": 123, "weakness_in_limbs": 124, "weakness_of_one_body_side": 125, "weight_gain": 126, "weight_loss": 127, "yellow_crust_ooze": 128, "yellow_urine": 129, "yellowing_of_eyes": 130, "yellowish_skin": 131
+        };
+        const searchInput = document.getElementById('search-input');
+        const selectedList = document.getElementById('selected-list');
+        const selectedCount = document.getElementById('selected-count');
+        const predictionResult = document.getElementById('prediction-result');
+        const predictedCondition = document.getElementById('predicted-condition');
+        const errorMessage = document.getElementById('error-message');
+        const explainButton = document.getElementById('explain-button');
+        const autocompleteList = document.getElementById('autocomplete-list');
+
+        let selectedSymptoms = [];
+        const maxSymptoms = 17;
+
+        function toggleCategory(categoryId) {
+            const categoryItems = document.getElementById(categoryId);
+            categoryItems.classList.toggle('show');
+        }
+
+        function updateSelectedList() {
+            selectedList.innerHTML = '';
+            selectedSymptoms.forEach(symptom => {
+                const tag = document.createElement('div');
+                tag.classList.add('selected-tag');
+                tag.textContent = symptom.replace(/_/g, " ");
+                const removeButton = document.createElement('span');
+                removeButton.textContent = ' ×';
+                removeButton.onclick = () => removeSymptom(symptom);
+                tag.appendChild(removeButton);
+                selectedList.appendChild(tag);
+            });
+            selectedCount.textContent = `${selectedSymptoms.length}/${maxSymptoms}`;
+        }
+
+        function addSymptom(symptom) {
+            if (selectedSymptoms.length >= maxSymptoms) {
+                errorMessage.textContent = "You can select a maximum of 17 symptoms.";
+                return;
+            }
+            errorMessage.textContent = "";
+            if (!selectedSymptoms.includes(symptom)) {
+                selectedSymptoms.push(symptom);
+                updateSelectedList();
+            }
+        }
+
+        function removeSymptom(symptom) {
+            selectedSymptoms = selectedSymptoms.filter(s => s !== symptom);
+            updateSelectedList();
+        }
+
+        document.querySelectorAll('.symptom-item').forEach(item => {
+            item.addEventListener('click', () => {
+                addSymptom(item.dataset.symptom);
+            });
+        });
+
+        document.getElementById('explain-button').addEventListener('click', function(){
+            alert("Explanation of diagnosis would go here");
+        });
+
+        function predictCondition() {
+            // Placeholder for prediction logic
+            if (selectedSymptoms.includes("headache") && selectedSymptoms.includes("chest_pain")) {
+                predictedCondition.textContent = "Hypertension";
+            } else if (selectedSymptoms.includes("cough") && selectedSymptoms.includes("breathlessness")) {
+                predictedCondition.textContent = "Respiratory Infection";
+            } else {
+                predictedCondition.textContent = "Unable to determine.";
+            }
+            predictionResult.style.display = "block";
+        }
+
+        searchInput.addEventListener('input', function() {
+            const inputValue = searchInput.value.toLowerCase();
+            autocompleteList.innerHTML = '';
+            autocompleteList.style.display = 'none';
+
+            if (inputValue.length > 0) {
+                const matchingSymptoms = Object.keys(symptomsData).filter(symptom =>
+                    symptom.toLowerCase().includes(inputValue)
+                );
+
+                if (matchingSymptoms.length > 0) {
+                    autocompleteList.style.display = 'block';
+                    matchingSymptoms.forEach(symptom => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = symptom.replace(/_/g, " ");
+                        listItem.addEventListener('click', () => {
+                            searchInput.value = '';
+                            autocompleteList.style.display = 'none';
+                            addSymptom(symptom);
+                        });
+                        autocompleteList.appendChild(listItem);
+                    });
+                }
+            }
+        });
+
+        searchInput.addEventListener('keypress', function(event) {
+            if (event.key === "Enter") {
+                const inputValue = searchInput.value;
+                if(symptomsData[inputValue.replace(/ /g, "_").toLowerCase()] !== undefined){
+                    addSymptom(inputValue.replace(/ /g, "_").toLowerCase());
+                    searchInput.value = "";
+                }
+
+            }
+        });
+        document.addEventListener('keypress', function(event){
+            if (event.key === "Predict"){
+                predictCondition();
+            }
+        });
+    </script>
+</body>
+</html>
