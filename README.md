@@ -2,11 +2,35 @@
 
 This project implements a machine learning model to predict potential health conditions based on user-selected symptoms. It features a Gradio web interface for easy interaction.
 
-![Application Screenshot](reports/figures/Prototype1.png)
-![Application Screenshot](reports/figures/Prototype2.png)
-![Application Screenshot](reports/figures/Prototype3.png)
-![Application Screenshot](reports/figures/Prototype4.png)
-![Application Screenshot](reports/figures/Prototype5.png)
+<p align="center">
+  <img src="reports/figures/Prototype1.png" alt="Application Screenshot" width="600"/>
+  <br/>
+  <em>User can pick symptoms and it predicts the most likely disease based on those.</em>
+</p>
+
+<p align="center">
+  <img src="reports/figures/Prototype2.png" alt="Detailed Prediction Screenshot" width="600"/>
+  <br/>
+  <em>User can look at the description of each predicted disease and the precautions.</em>
+</p>
+
+<p align="center">
+  <img src="reports/figures/Prototype3.png" alt="Severity Score Screenshot" width="600"/>
+  <br/>
+  <em>This calculates the severity of each symptom picked; the score is from the Symptom_severity.csv.</em>
+</p>
+
+<p align="center">
+  <img src="reports/figures/Prototype4.png" alt="Symptom Network Screenshot 1" width="600"/>
+  <br/>
+  <em>It shows the network relationship between symptoms picked; purple is direct connection.</em>
+</p>
+
+<p align="center">
+  <img src="reports/figures/Prototype5.png" alt="Symptom Network Screenshot 2" width="600"/>
+  <br/>
+  <em>Green indicates an indirect relationship through other common symptoms (not a direct connection).</em>
+</p>
 
 ## Project Structure
 
