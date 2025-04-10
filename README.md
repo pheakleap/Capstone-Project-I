@@ -2,7 +2,11 @@
 
 This project implements a machine learning model to predict potential health conditions based on user-selected symptoms. It features a Gradio web interface for easy interaction.
 
-![Application Screenshot](reports/figures/prototype1.png)
+![Application Screenshot](reports/figures/Prototype1.png)
+![Application Screenshot](reports/figures/Prototype2.png)
+![Application Screenshot](reports/figures/Prototype3.png)
+![Application Screenshot](reports/figures/Prototype4.png)
+![Application Screenshot](reports/figures/Prototype5.png)
 
 ## Project Structure
 
