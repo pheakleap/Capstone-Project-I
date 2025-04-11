@@ -1,90 +1,94 @@
 import gradio as gr
+import numpy as np
 import pandas as pd
+import joblib
 
-# Mock data - Replace with your actual data
-SYMPTOMS = ["headache", "fatigue", "fever", "cough", "rash"]  # 150+ symptoms
-CATEGORIES = {
-    "Pain": ["headache", "chest_pain", "joint_pain"],
-    "Respiratory": ["cough", "shortness_of_breath"],
-    "General": ["fever", "fatigue"]
-}
+# Load models
+model = joblib.load("D:/Term7/Capstone-Project-I/src/models/best_ensemble_model.joblib")
+symptom_encoder = joblib.load("D:/Term7/Capstone-Project-I/src/models/symptom_encoder.joblib")
+disease_encoder = joblib.load("D:/Term7/Capstone-Project-I/src/models/disease_encoder.joblib")
 
-# Initialize state
-selected_symptoms = set()
-MAX_SYMPTOMS = 17
+all_symptoms = symptom_encoder.classes_
+all_diseases = disease_encoder.classes_
 
-def filter_symptoms(search_term):
-    return [s for s in SYMPTOMS if search_term.lower() in s.lower()]
+def predict_disease(*symptom_values):
+    print("Symptom Values:", symptom_values)  # Add this line
+    try:
+        # Convert checkbox values to symptom names
+        selected_symptoms = [all_symptoms[i] for i, checked in enumerate(symptom_values) if checked]
 
-def update_interface(search_term, *args):
-    global selected_symptoms
-    # Update selections
-    for symptom, selected in zip(SYMPTOMS, args):
-        if selected and len(selected_symptoms) < MAX_SYMPTOMS:
-            selected_symptoms.add(symptom)
-        elif not selected and symptom in selected_symptoms:
-            selected_symptoms.discard(symptom)
-    
-    # Create selected tags
-    tags = " ".join([f"**{s}** ✕" for s in selected_symptoms])
-    
-    # Create warning
-    warning = ""
-    if len(selected_symptoms) >= MAX_SYMPTOMS:
-        warning = "⚠️ Maximum 17 symptoms allowed"
-    
-    # Filter search results
-    search_results = filter_symptoms(search_term) if search_term else []
-    
-    return {
-        selected_panel: f"**Selected ({len(selected_symptoms)}/17):**\n{tags}",
-        warning_component: warning,
-        search_dropdown: gr.Dropdown(choices=search_results)
-    }
+        # Create feature DataFrame with correct column names
+        features = pd.DataFrame(np.zeros((1, len(all_symptoms))), columns=all_symptoms)
 
-def predict():
-    if not selected_symptoms:
-        return "**Please select at least 1 symptom**"
-    
-    # Add your prediction logic here
-    return "**Likely Condition:** Migraine\n**Confidence:** 82%"
+        # Set selected symptoms to 1
+        for symptom in selected_symptoms:
+            features[symptom] = 1
 
-# Build interface
-with gr.Blocks(theme=gr.themes.Soft(), title="Medical Symptom Checker") as demo:
-    # Header
-    gr.Markdown("# 🩺 Symptom Checker")
-    
-    # Search row
+        # Get predictions
+        predicted_index = model.predict(features)[0]
+        probabilities = model.predict_proba(features)[0]
+
+        # Top 3 predictions
+        top3_indices = np.argsort(probabilities)[-3:][::-1]
+
+        return {
+            "Primary Diagnosis": {
+                "Disease": all_diseases[top3_indices[0]],
+                "Confidence": f"{probabilities[top3_indices[0]] * 100:.1f}%"
+            },
+            "Secondary Options": [
+                {
+                    "Disease": all_diseases[top3_indices[1]],
+                    "Confidence": f"{probabilities[top3_indices[1]] * 100:.1f}%"
+                },
+                {
+                    "Disease": all_diseases[top3_indices[2]],
+                    "Confidence": f"{probabilities[top3_indices[2]] * 100:.1f}%"
+                }
+            ],
+            "Symptoms Considered": len(selected_symptoms),
+            "Detailed Symptoms": [s.replace('_', ' ').title() for s in selected_symptoms]
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+# Gradio Interface
+with gr.Blocks(theme=gr.themes.Soft(), title="Medical Diagnosis Assistant") as app:
+    gr.Markdown("## 🩺 Medical Diagnosis Assistant")
+
     with gr.Row():
-        search = gr.Textbox(label="Search symptoms", placeholder="Start typing...")
-        search_dropdown = gr.Dropdown(label="Matching symptoms", interactive=True)
-    
-    # Category sections
-    with gr.Tabs():
-        for category, symptoms in CATEGORIES.items():
-            with gr.Tab(category):
-                with gr.Row():
-                    for symptom in symptoms:
-                        gr.Checkbox(symptom, label=symptom.replace("_", " ").title())
-    
-    # Selected panel
-    selected_panel = gr.Markdown("**Selected (0/17):**")
-    warning_component = gr.Markdown()
-    
-    # Prediction
-    with gr.Row():
-        gr.Button("Clear Selections", variant="secondary")
-        predict_btn = gr.Button("Analyze Symptoms", variant="primary")
-    
-    result = gr.Markdown()
+        with gr.Column(scale=2):
+            # Symptom checkboxes (3 columns)
+            checkboxes = []
+            with gr.Tabs():
+                with gr.Tab("General Symptoms"):
+                    with gr.Row():
+                        for col in range(3):  # 3 columns
+                            with gr.Column():
+                                start_idx = col * (len(all_symptoms) // 3)
+                                end_idx = (col + 1) * (len(all_symptoms) // 3)
+                                for symptom in all_symptoms[start_idx:end_idx]:
+                                    checkboxes.append(gr.Checkbox(label=symptom.replace('_', ' ').title()))
+            submit_btn = gr.Button("Analyze Symptoms", variant="primary")
 
-    # Event handling
-    search.change(
-        update_interface,
-        [search] + [comp for comp in demo.blocks.values() if isinstance(comp, gr.Checkbox)],
-        [selected_panel, warning_component, search_dropdown]
+        with gr.Column(scale=1):
+            with gr.Accordion("Results", open=True):
+                diagnosis_output = gr.JSON()
+            with gr.Accordion("How to Interpret", open=False):
+                gr.Markdown("""
+                    - **Primary Diagnosis**: Most likely condition
+                    - **Secondary Options**: Alternative possibilities
+                    - **Confidence**: Model's certainty
+                    """)
+
+    # Prediction logic
+    submit_btn.click(
+        fn=predict_disease,
+        inputs=checkboxes,
+        outputs=diagnosis_output
     )
-    
-    predict_btn.click(predict, None, result)
 
-demo.launch()
+# Launch
+if __name__ == "__main__":
+    app.launch()
